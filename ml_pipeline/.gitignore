@@ -1,0 +1,21 @@
+# ml_pipeline/.gitignore
+
+# Datasets (trop volumineux)
+*.csv
+logs.csv
+new_logs.csv
+
+# Modèles générés
+*.joblib
+*.pkl
+
+# Métriques
+metrics.txt
+metrics_*.txt
+comparison_summary.txt
+predictions.csv
+
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
