@@ -1,4 +1,5 @@
-models/*.joblib
-models/*.pkl
-models/*.h5
-models/*.txt
+*.joblib
+*.pkl
+*.h5
+
+*.txt
