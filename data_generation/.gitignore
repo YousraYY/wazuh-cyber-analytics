@@ -1,0 +1,13 @@
+# data_generation/.gitignore
+
+# Ignorer les datasets volumineux
+*.json
+*.jsonl
+*.csv
+*.zip
+*.gz
+
+# Mais garder le script
+!inject_logs.py
+!inject_logs1.py 
+

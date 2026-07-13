@@ -1,0 +1,19 @@
+schedule:
+  interval_minutes: 5
+
+wazuh:
+  host: https://wazuh.indexer:9200
+  username: admin
+  password: admin
+  source_index: wazuh-alerts-4.x-*
+  target_index: wazuh-ml-enriched-logs
+  verify_ssl: false
+
+ml:
+  model_path: ml_model_randomforest.joblib
+  risk_thresholds:
+    normal: 30
+    suspicious: 70
+
+logging:
+  file: automation.log
