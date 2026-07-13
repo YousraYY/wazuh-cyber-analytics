@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from utils.wazuh_connector import get_wazuh_connector
 from utils.data_processing import clean_dataframe, get_summary_stats
