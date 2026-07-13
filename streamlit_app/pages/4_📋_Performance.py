@@ -137,7 +137,6 @@ with tab2:
 # =========================
 with tab3:
     st.markdown("### 💾 Rapport de performance")
-
     report = f"""
 # Rapport ML – Wazuh
 
@@ -147,6 +146,7 @@ Total événements: {total}
 Normaux: {normal}
 Attaques: {attack}
 Taux de détection: {detection_rate:.1f}%
+
 
 Risk score moyen: {avg_risk:.2f}
 Événements critiques: {high_risk}

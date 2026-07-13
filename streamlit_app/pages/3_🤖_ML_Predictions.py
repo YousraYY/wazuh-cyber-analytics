@@ -1,3 +1,4 @@
+
 import streamlit as st
 from utils.wazuh_ml_sender import send_ml_alerts_to_wazuh
 import pandas as pd
@@ -21,7 +22,24 @@ if "df" not in st.session_state or st.session_state.df.empty:
     st.info("👉 Allez d'abord sur la page **Data Explorer**")
     st.stop()
 
-df = st.session_state.df.copy()
+# Préparer les données
+df_original = st.session_state.df.copy()
+df = prepare_data_for_ml(df_original)
+
+# Afficher un aperçu des données
+with st.expander("🔍 Aperçu des données préparées"):
+    st.write(f"**Dimensions:** {df.shape[0]} lignes × {df.shape[1]} colonnes")
+    st.write("**Colonnes disponibles:**")
+    st.code(", ".join(df.columns.tolist()))
+    
+    # Vérifier les types de données
+    st.write("**Types de données:**")
+    type_info = pd.DataFrame({
+        'Colonne': df.columns,
+        'Type': df.dtypes.astype(str),
+        'Valeurs uniques': df.nunique()
+    })
+    st.dataframe(type_info.head(10), use_container_width=True)
 
 # ==========================================================
 # MODEL STATUS

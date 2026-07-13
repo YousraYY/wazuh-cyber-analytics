@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from utils.wazuh_connector import get_wazuh_connector
 from utils.data_processing import clean_dataframe, get_summary_stats
@@ -118,6 +118,7 @@ with st.sidebar:
     else:
         ssh_ratio = http_ratio = firewall_ratio = 0.0
 
+
     refresh = st.button("🔄 Charger les données", use_container_width=True)
 
 
@@ -126,14 +127,14 @@ with st.sidebar:
 # ==========================================================
 if "df" not in st.session_state:
     st.session_state.df = pd.DataFrame()
-    st.session_state.df_raw = pd.DataFrame()
-    st.session_state.load_mode = ""
+    st.session_state.last_update = None
 
 
 # ==========================================================
 # LOAD DATA (🔥 FIXED LOGIC 🔥)
 # ==========================================================
 if refresh or st.session_state.df.empty:
+
     with st.spinner("Chargement des données..."):
 
         if load_mode == "📤 Depuis Wazuh":
@@ -165,6 +166,7 @@ if refresh or st.session_state.df.empty:
 
         else:
             generate_simulated_data(num_logs, ssh_ratio, http_ratio, firewall_ratio)
+
 
 
 # ==========================================================
