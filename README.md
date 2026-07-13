@@ -22,3 +22,8 @@ $ docker-compose up -d
 ```
 
 The environment takes about 1 minute to get up (depending on your Docker host) for the first time since Wazuh Indexer must be started for the first time and the indexes and index patterns must be generated.
+
+## Data
+Sample datasets (5k / 10k alerts) are included in the repo for quick testing.
+The full dataset (~850MB, ~full Wazuh alert export) is not included due to size.
+To regenerate it, run: `python data_generation/generate_alerts.py`

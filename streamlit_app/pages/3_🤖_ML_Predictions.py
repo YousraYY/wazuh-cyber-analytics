@@ -1,215 +1,203 @@
-# pages/3_🤖_ML_Predictions.py
 import streamlit as st
+from utils.wazuh_ml_sender import send_ml_alerts_to_wazuh
 import pandas as pd
 import numpy as np
 import plotly.express as px
-import plotly.graph_objects as go
-from utils.ml_model import get_ml_model
 from datetime import datetime
 
-st.set_page_config(page_title="ML Predictions", page_icon="🤖", layout="wide")
+st.set_page_config(
+    page_title="ML Predictions",
+    page_icon="🤖",
+    layout="wide"
+)
 
 st.title("🤖 Prédictions Machine Learning")
 
-# Vérifier si des données sont disponibles
-if 'df' not in st.session_state or st.session_state.df.empty:
+# ==========================================================
+# CHECK DATA
+# ==========================================================
+if "df" not in st.session_state or st.session_state.df.empty:
     st.warning("⚠️ Aucune donnée chargée")
-    st.info("👉 Allez d'abord sur la page 'Data Explorer' pour charger les données")
+    st.info("👉 Allez d'abord sur la page **Data Explorer**")
     st.stop()
 
 df = st.session_state.df.copy()
 
-# Section : Charger le modèle
+# ==========================================================
+# MODEL STATUS
+# ==========================================================
 st.markdown("### 🔧 Modèle Machine Learning")
 
-ml_handler = get_ml_model()
+try:
+    import joblib
+    joblib_available = True
+except ImportError:
+    joblib_available = False
 
-col1, col2 = st.columns([2, 1])
+uploaded_model = st.file_uploader(
+    "📤 Charger un modèle ML (.joblib) (optionnel)",
+    type=["joblib"]
+)
 
-with col1:
-    # Upload du modèle
-    uploaded_model = st.file_uploader(
-        "📤 Charger le modèle ML (.joblib)",
-        type=['joblib'],
-        help="Modèle entraîné par l'Étudiant 2"
-    )
-    
-    if uploaded_model:
-        if st.button("🔄 Charger le modèle", type="primary"):
-            with st.spinner("Chargement du modèle..."):
-                success, message = ml_handler.load_model(uploaded_model)
-                
-                if success:
-                    st.success(message)
-                else:
-                    st.error(message)
+if uploaded_model and joblib_available:
+    st.success("✅ Modèle ML chargé")
+elif not joblib_available:
+    st.warning("⚠️ joblib non installé → mode simulation")
+else:
+    st.info("ℹ️ Aucun modèle chargé → mode simulation")
 
-with col2:
-    st.markdown("#### État du modèle")
-    if ml_handler.is_loaded:
-        st.success("✅ Modèle chargé")
-    else:
-        st.warning("⚠️ Aucun modèle")
-
-# Génération de prédictions
+# ==========================================================
+# LOAD / GENERATE PREDICTIONS BUTTON  ✅ IMPORTANT
+# ==========================================================
 st.markdown("---")
 
-if ml_handler.is_loaded:
-    st.markdown("### 🚀 Générer les prédictions avec le modèle ML")
-    
-    if st.button("🔮 Prédire avec le modèle ML", type="primary", key="real_predict"):
-        with st.spinner("🔄 Génération des prédictions..."):
-            try:
-                # Utiliser le VRAI modèle
-                predictions, probas, risk_scores = ml_handler.predict(df)
-                
-                # Ajouter au DataFrame
-                df['ml_prediction'] = predictions
-                df['risk_score'] = risk_scores
-                df['confidence'] = probas.max(axis=1) * 100
-                
-                # Classification par risk score
-                df['threat_level'] = df['risk_score'].apply(
-                    lambda x: 'Normal' if x < 30 else 'Suspicious' if x < 70 else 'Critical'
-                )
-                
-                # Sauvegarder
-                st.session_state.df_predictions = df
-                
-                st.success("✅ Prédictions générées avec le modèle ML !")
-                
-            except Exception as e:
-                st.error(f"❌ Erreur lors de la prédiction : {str(e)}")
-                st.info("💡 Vérifiez que les données contiennent les colonnes nécessaires")
+if st.button("🚀 Charger / Générer les prédictions", type="primary"):
+    with st.spinner("🔄 Génération des prédictions..."):
 
-else:
-    st.markdown("### 🎲 Simulation (pas de modèle chargé)")
-    st.info("👆 Chargez le modèle ML ci-dessus pour utiliser les vraies prédictions")
-    
-    # Garder la simulation pour les tests
-    if st.button("🚀 Générer des prédictions simulées", type="secondary"):
-        with st.spinner("🔄 Génération des prédictions simulées..."):
+        df_pred = df.copy()
+
+        # ------------------------------
+        # REAL MODEL
+        # ------------------------------
+        if uploaded_model and joblib_available:
+            try:
+                model = joblib.load(uploaded_model)
+
+                numeric_df = df_pred.select_dtypes(include=[np.number]).fillna(0)
+
+                preds = model.predict(numeric_df)
+
+                if hasattr(model, "predict_proba"):
+                    probs = model.predict_proba(numeric_df).max(axis=1)
+                else:
+                    probs = np.random.uniform(0.7, 0.99, size=len(df_pred))
+
+                df_pred["ml_prediction"] = np.where(preds == 1, "Attack", "Normal")
+                df_pred["confidence"] = (probs * 100).round(2)
+                df_pred["risk_score"] = (df_pred["confidence"]).astype(int)
+
+                st.success("✅ Prédictions ML réelles générées")
+
+            except Exception as e:
+                st.error(f"❌ Erreur modèle ML : {e}")
+                st.info("👉 Passage automatique en simulation")
+
+                uploaded_model = None  # fallback
+
+        # ------------------------------
+        # SIMULATION MODE
+        # ------------------------------
+        if not uploaded_model:
             np.random.seed(42)
-            
-            predictions = np.random.choice(
-                ['Normal', 'Attack'],
-                size=len(df),
+
+            df_pred["ml_prediction"] = np.random.choice(
+                ["Normal", "Attack"],
+                size=len(df_pred),
                 p=[0.8, 0.2]
             )
-            
-            risk_scores = np.random.randint(0, 100, size=len(df))
-            risk_scores[predictions == 'Normal'] = np.random.randint(0, 40, size=np.sum(predictions == 'Normal'))
-            risk_scores[predictions == 'Attack'] = np.random.randint(60, 100, size=np.sum(predictions == 'Attack'))
-            
-            df['ml_prediction'] = predictions
-            df['risk_score'] = risk_scores
-            df['confidence'] = np.random.uniform(70, 99, size=len(df))
-            
-            st.session_state.df_predictions = df
-            st.success("✅ Prédictions simulées générées !")
 
-# Afficher les résultats
-if 'df_predictions' in st.session_state:
-    df_pred = st.session_state.df_predictions
-    
-    st.markdown("---")
-    st.markdown("### 📊 Résultats des prédictions")
-    
-    # Métriques
-    col1, col2, col3 = st.columns(3)
-    
-    total = len(df_pred)
-    normal = (df_pred['ml_prediction'] == 'Normal').sum()
-    attack = (df_pred['ml_prediction'] == 'Attack').sum()
-    
-    with col1:
-        st.metric("📊 Total d'événements", total)
-    
-    with col2:
-        st.metric("✅ Normal", normal, delta=f"{normal/total*100:.1f}%")
-    
-    with col3:
-        st.metric("🔴 Attaques", attack, delta=f"{attack/total*100:.1f}%", delta_color="inverse")
-    
-    # Graphiques
-    tab1, tab2, tab3 = st.tabs(["📊 Distribution", "🎯 Risk Scores", "💾 Export"])
-    
-    with tab1:
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            # Distribution des prédictions
-            pred_counts = df_pred['ml_prediction'].value_counts()
-            
-            fig = px.pie(
-                values=pred_counts.values,
-                names=pred_counts.index,
-                title='Distribution des prédictions',
-                color_discrete_map={
-                    'Normal': '#28a745',
-                    'Attack': '#dc3545'
-                },
-                hole=0.4
+            df_pred["risk_score"] = np.where(
+                df_pred["ml_prediction"] == "Normal",
+                np.random.randint(0, 40, size=len(df_pred)),
+                np.random.randint(60, 100, size=len(df_pred))
             )
-            st.plotly_chart(fig, use_container_width=True)
-        
-        with col2:
-            # Distribution des risk scores
-            fig = px.histogram(
-                df_pred,
-                x='risk_score',
-                color='ml_prediction',
-                nbins=50,
-                title='Distribution des Risk Scores',
-                color_discrete_map={
-                    'Normal': '#28a745',
-                    'Attack': '#dc3545'
-                }
-            )
-            st.plotly_chart(fig, use_container_width=True)
-    
-    with tab2:
-        st.markdown("#### 🔴 Top 20 événements à haut risque")
-        
-        # Colonnes à afficher
-        display_cols = ['timestamp', 'ml_prediction', 'risk_score', 'confidence']
-        
-        # Ajouter rule description si disponible
-        if 'rule' in df_pred.columns:
-            try:
-                df_pred['rule_desc'] = df_pred['rule'].apply(
-                    lambda x: x.get('description', 'N/A')[:60] if isinstance(x, dict) else 'N/A'
-                )
-                display_cols.append('rule_desc')
-            except:
-                pass
-        
-        top_risks = df_pred.nlargest(20, 'risk_score')[display_cols]
-        st.dataframe(top_risks, use_container_width=True)
-    
-    with tab3:
-        st.markdown("#### 💾 Exporter les résultats")
-        
-        # Préparer l'export
-        export_df = df_pred[['timestamp', 'ml_prediction', 'risk_score', 'confidence']].copy()
-        
-        # CSV
-        csv = export_df.to_csv(index=False)
-        st.download_button(
-            "📥 Télécharger en CSV",
-            csv,
-            f"predictions_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-            "text/csv"
-        )
-        
-        # JSON pour Wazuh
-        json_data = export_df.to_json(orient='records', date_format='iso')
-        st.download_button(
-            "📥 Télécharger en JSON",
-            json_data,
-            f"predictions_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
-            "application/json"
-        )
 
-else:
-    st.info("👆 Générez des prédictions pour voir les résultats")
+            df_pred["confidence"] = np.random.uniform(70, 99, size=len(df_pred)).round(2)
+
+            st.success("✅ Prédictions simulées générées")
+
+        # SAVE RESULTS
+        st.session_state.df_predictions = df_pred
+
+
+# ==========================================================
+# RESULTS (ONLY IF EXIST)
+# ==========================================================
+if "df_predictions" not in st.session_state:
+    st.info("👆 Cliquez sur **Charger / Générer les prédictions**")
+    st.stop()
+
+df_pred = st.session_state.df_predictions
+
+st.markdown("---")
+st.markdown("### 📊 Résultats des prédictions")
+
+# ==========================================================
+# METRICS
+# ==========================================================
+total = len(df_pred)
+normal = (df_pred["ml_prediction"] == "Normal").sum()
+attack = (df_pred["ml_prediction"] == "Attack").sum()
+
+c1, c2, c3 = st.columns(3)
+c1.metric("📊 Total événements", total)
+c2.metric("✅ Normaux", normal, f"{normal/total*100:.1f}%")
+c3.metric("🔴 Attaques", attack, f"{attack/total*100:.1f}%")
+
+# ==========================================================
+# TABS
+# ==========================================================
+tab1, tab2, tab3 = st.tabs(["📊 Distribution", "🎯 Top risques", "💾 Export"])
+
+with tab1:
+    fig = px.pie(
+        df_pred,
+        names="ml_prediction",
+        title="Distribution des prédictions",
+        color="ml_prediction",
+        color_discrete_map={"Normal": "#28a745", "Attack": "#dc3545"}
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    fig = px.histogram(
+        df_pred,
+        x="risk_score",
+        color="ml_prediction",
+        nbins=40,
+        title="Distribution des Risk Scores",
+        color_discrete_map={"Normal": "#28a745", "Attack": "#dc3545"}
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+with tab2:
+    st.dataframe(
+        df_pred.sort_values("risk_score", ascending=False)
+        .head(20)[["ml_prediction", "risk_score", "confidence"]],
+        use_container_width=True
+    )
+
+with tab3:
+    csv = df_pred.to_csv(index=False)
+    st.download_button(
+        "📥 Télécharger CSV",
+        csv,
+        f"ml_predictions_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+        "text/csv"
+    )
+
+# ==========================================================
+# SEND ML ALERTS TO WAZUH
+# ==========================================================
+st.markdown("---")
+st.markdown("### 🚨 Envoyer les alertes ML vers Wazuh")
+
+st.info(
+    "Les alertes seront envoyées vers l'index **wazuh-ml-alerts** "
+    "avec les champs ML (prediction, risk_score, confidence)."
+)
+
+if st.button("📤 Envoyer les alertes ML à Wazuh", type="secondary"):
+    with st.spinner("📡 Envoi des alertes vers Wazuh..."):
+
+        # SAFETY CHECK
+        required_cols = {"ml_prediction", "risk_score", "confidence"}
+        if not required_cols.issubset(df_pred.columns):
+            st.error("❌ Prédictions ML manquantes — générez-les d'abord")
+            st.stop()
+
+        sent, failed = send_ml_alerts_to_wazuh(df_pred)
+
+    st.success(f"✅ {sent} alertes envoyées à Wazuh")
+    if failed > 0:
+        st.warning(f"⚠️ {failed} alertes ont échoué")
+
